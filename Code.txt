@@ -1,0 +1,112 @@
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h> // for usleep
+#include <stdbool.h> // for bool type
+#include <signal.h>
+
+// Define task priorities (for illustration)
+#define HIGH_PRIORITY 1
+#define MEDIUM_PRIORITY 2
+#define LOW_PRIORITY 3
+
+// Shared resource (mutex)
+pthread_mutex_t shared_resource;
+
+// Flag to indicate simulated user input (volatile for thread safety)
+volatile sig_atomic_t user_input_flag = 0;
+
+// Task functions
+void* high_priority_task(void* arg) {
+  while (1) {
+    // Acquire the shared resource
+    pthread_mutex_lock(&shared_resource);
+
+    // Loop while user input flag is true
+    while (user_input_flag) {
+      printf("High priority task: Performing work\n");
+      // Replace with your actual high-priority work
+      usleep(1000); // Simulate some work (1 millisecond)
+    }
+
+    // Release the shared resource
+    pthread_mutex_unlock(&shared_resource);
+    usleep(1000); // Simulate some non-critical work (1 millisecond)
+  }
+  return NULL;
+}
+
+void* medium_priority_task(void* arg) {
+  while (1) {
+    // Acquire the shared resource
+    pthread_mutex_lock(&shared_resource);
+    printf("Medium priority task: Performing work\n");
+    usleep(2000); // Simulate some work (2 milliseconds)
+    // Release the shared resource
+    pthread_mutex_unlock(&shared_resource);
+    usleep(3000); // Simulate some non-critical work (3 milliseconds)
+  }
+  return NULL;
+}
+
+void* low_priority_task(void* arg) {
+  while (1) {
+    // Acquire the shared resource
+    pthread_mutex_lock(&shared_resource);
+    printf("Low priority task: Performing work\n");
+    usleep(4000); // Simulate some work (4 milliseconds)
+    // Release the shared resource
+    pthread_mutex_unlock(&shared_resource);
+    usleep(5000); // Simulate some non-critical work (5 milliseconds)
+  }
+  return NULL;
+}
+
+int main() {
+  // Initialize the shared resource
+  if (pthread_mutex_init(&shared_resource, NULL) != 0) {
+    perror("pthread_mutex_init failed");
+    return 1;
+  }
+
+  // Create threads for each task
+  pthread_t high_thread, medium_thread, low_thread;
+  if (pthread_create(&high_thread, NULL, high_priority_task, NULL) != 0) {
+    perror("pthread_create failed for high thread");
+    pthread_mutex_destroy(&shared_resource);
+    return 1;
+  }
+
+  if (pthread_create(&medium_thread, NULL, medium_priority_task, NULL) != 0) {
+    perror("pthread_create failed for medium thread");
+    pthread_mutex_destroy(&shared_resource);
+    pthread_join(high_thread, NULL); // Join the already created high thread
+    return 1;
+  }
+
+  if (pthread_create(&low_thread, NULL, low_priority_task, NULL) != 0) {
+    perror("pthread_create failed for low thread");
+    pthread_mutex_destroy(&shared_resource);
+    pthread_join(high_thread, NULL);
+    pthread_join(medium_thread, NULL);
+    return 1;
+  }
+
+  while (1) {
+    printf("Main thread: Simulate user input (Press Enter to activate high priority task): ");
+    getchar(); // Wait for user to press Enter
+
+    user_input_flag = 1; // Set flag to true
+
+    printf("Main thread: Press Enter again to deactivate high priority task\n");
+    getchar(); // Wait for user to press Enter again
+
+    user_input_flag = 0; // Set flag to false
+  }
+
+  // Wait for threads to finish (may need a better termination mechanism)
+  pthread_join(high_thread, NULL);
+  pthread_join(medium_thread, NULL);
+  pthread_join(low_thread, NULL);
+
+  // Clean up
+}
